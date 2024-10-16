@@ -8,10 +8,12 @@ DICT_METRICS = {'precision': ['binary', 'micro', 'macro', 'weighted', 'samples',
                 'roc auc': ['binary', 'micro', 'macro', 'weighted', 'samples', None]}
 
 class Metrics(metrics):
-    def __init__(self, Y_true: np.array, Y_pred: np.array, sample_weight=None):
+    def __init__(self, Y_true: np.array, Y_pred: np.array, 
+                 Y_pred_proba: np.array, sample_weight=None):
         super().__init__()
         self.Y_true = Y_true
         self.Y_pred = Y_pred
+        self.Y_pred_proba = Y_pred_proba
         assert Y_true.shape == Y_pred.shape, 'Shape Mismatch'
         self.sample_weight = None if sample_weight == None else sample_weight
         
@@ -62,10 +64,11 @@ class Metrics(metrics):
                                                          strategy=self.strategy)
         return balanced_accuracy
     
-    def roc_auc(self, strategy=None):
+    def roc_auc(self, average=None):
         roc_auc = self.roc_auc_score(Y_true=self.Y_true, 
-                                     Y_pred=self.Y_pred,
-                                     sample_weight=self.sample_weight)
+                                     Y_pred=self.Y_pred_proba,
+                                     sample_weight=self.sample_weight,
+                                     average=self.average)
         return roc_auc
         
         

@@ -1,48 +1,37 @@
-Class HyperparameterTuner:
-    def __init__(self, n_trials: int, n_splits: int, study: str):
+from tuner import objective_fun
+import optuna
+import numpy as np
+
+class HyperparameterTuner:
+    def __init__(self, n_trials: int=100, study: str='Unknown Study',
+                 direction: str='maximize'):
         self.n_trials = n_trials
-        self.n_splits = n_splits
         self.study = study
+        self.direction = direction
         self.best_training_score = None
         self.best_validation_score = None
 
-    def tune(self, X, Y, classifier):
-        def objective(trial):
-            
-            clf = classifier(trial)
-            clf = clf.classifier(trial)
-            skf = StratifiedKFold(n_splits=self.n_splits)
-            
-            list_train_score   = []
-            list_val_score     = []
-            
-            for train_idx, test_idx in skf.split(X, Y):
+    def tune(self, X: np.array, Y:np.array, model):
+        self.X = X
+        self.Y = Y
+        self.model = model
+        objective = objective_fun.ObjectiveFunction(X=self.X, 
+                                                    Y=self.Y, 
+                                                    model=self.model)
+        if 'classifier' in objective.model_type:
+            mean_training_score = objective.classifier_score()[0]
+            mean_validation_score = objective.classifier_score()[1]
+        elif 'regressor' in objective.model_type:
+            mean_training_score = objective.regressor_score()[0]
+            mean_validation_score = objective.regressor_score()[1]
+        else:
+            raise ValueError('Invalid Model Type')
+        
+        if self.best_validation_score is None or mean_validation_score > self.best_validation_score:
+            self.best_training_score = mean_training_score
+            self.best_validation_score = mean_validation_score
 
-                X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-                Y_train, Y_test = Y.iloc[train_idx], Y.iloc[test_idx]
-
-                clf.fit(X_train, Y_train)
-                
-                Y_train_pred = clf.predict(X_train)
-                Y_test_pred  = clf.predict(X_test)
-                
-                train_score  = roc_auc(Y_train, Y_train_pred)
-                val_score    = roc_auc(Y_test, Y_test_pred)
-                
-                list_train_score.append(train_score)
-                list_val_score.append(val_score)
-                
-            mean_training_score = np.mean(list_train_score)
-            mean_validation_score = np.mean(list_val_score)
-                
-            if self.best_validation_score is None or mean_validation_score > self.best_validation_score:
-                self.best_training_score = mean_training_score
-                self.best_validation_score = mean_validation_score
-                
-            # Return the average accuracy of both classifiers
-            return mean_validation_score
-
-        self.study = optuna.create_study(direction='maximize')
+        self.study = optuna.create_study(direction=self.direction)
         self.study.optimize(objective, n_trials=self.n_trials)
 
     def get_best_params(self):
